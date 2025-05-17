@@ -107,9 +107,19 @@ class OpenMathReasoningEnv(BaseEnv):
         await super().wandb_log(wandb_metrics)
 
     async def setup(self):
-        # Load OpenMathReasoning dataset
-        self.train = load_dataset("open-math-reasoning", split="train").shuffle(seed=42)
-        test_data = load_dataset("open-math-reasoning", split="test").shuffle(seed=42)
+        # Load OpenMathReasoning dataset - only 'cot' split is available
+        full_dataset = load_dataset("nvidia/OpenMathReasoning", split="cot").shuffle(seed=42)
+        
+        # Create our own train/test split in 98:2 ratio
+        dataset_size = len(full_dataset)
+        test_size = int(dataset_size * 0.02)  # 2% for test
+        train_size = dataset_size - test_size  # 98% for train
+        
+        # Split the dataset
+        self.train = full_dataset.select(range(train_size))
+        test_data = full_dataset.select(range(train_size, dataset_size))
+        
+        # Process test data
         self.test = list()
         for item in test_data:
             self.test.append(

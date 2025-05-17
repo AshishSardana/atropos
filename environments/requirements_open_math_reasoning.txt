@@ -1,0 +1,8 @@
+# Core dependencies
+datasets>=2.8.0
+latex2sympy2_extended>=0.1.0
+math_verify>=0.1.0
+tqdm>=4.64.0
+
+# Atropos dependencies should already be installed with the framework
+# This file lists only the additional dependencies needed for OpenMathReasoning 
