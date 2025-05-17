@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.13' and sys_platform == 'linux'",
@@ -167,13 +168,14 @@ wheels = [
 
 [[package]]
 name = "atroposlib"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "datasets" },
     { name = "fastapi" },
+    { name = "gymnasium" },
     { name = "hf-transfer" },
     { name = "jinja2" },
     { name = "jsonlines" },
@@ -186,7 +188,6 @@ dependencies = [
     { name = "pydantic-cli" },
     { name = "rich" },
     { name = "tenacity" },
-    { name = "torch" },
     { name = "tqdm" },
     { name = "transformers" },
     { name = "uvicorn", extra = ["standard"] },
@@ -199,11 +200,13 @@ all = [
     { name = "flake8" },
     { name = "gradio" },
     { name = "isort" },
+    { name = "langdetect" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "rich" },
+    { name = "torch" },
 ]
 dev = [
     { name = "black" },
@@ -217,6 +220,11 @@ dev = [
 ]
 examples = [
     { name = "gradio" },
+    { name = "langdetect" },
+    { name = "torch" },
+]
+rewardfns = [
+    { name = "torch" },
 ]
 
 [package.metadata]
@@ -224,15 +232,18 @@ requires-dist = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "atroposlib", extras = ["dev", "examples"], marker = "extra == 'all'" },
+    { name = "atroposlib", extras = ["rewardfns"], marker = "extra == 'examples'" },
     { name = "black", marker = "extra == 'dev'" },
     { name = "datasets" },
     { name = "fastapi" },
     { name = "flake8", marker = "extra == 'dev'" },
     { name = "gradio", marker = "extra == 'examples'" },
+    { name = "gymnasium" },
     { name = "hf-transfer" },
     { name = "isort", marker = "extra == 'dev'" },
     { name = "jinja2" },
     { name = "jsonlines" },
+    { name = "langdetect", marker = "extra == 'examples'" },
     { name = "markdown" },
     { name = "math-verify", specifier = "==0.7.0" },
     { name = "mypy", marker = "extra == 'dev'" },
@@ -247,12 +258,13 @@ requires-dist = [
     { name = "rich" },
     { name = "rich", marker = "extra == 'dev'" },
     { name = "tenacity" },
-    { name = "torch" },
+    { name = "torch", marker = "extra == 'rewardfns'" },
     { name = "tqdm" },
-    { name = "transformers", specifier = "==4.48.3" },
+    { name = "transformers" },
     { name = "uvicorn", extras = ["standard"] },
     { name = "wandb" },
 ]
+provides-extras = ["all", "rewardfns", "dev", "examples"]
 
 [[package]]
 name = "attrs"
@@ -429,6 +441,15 @@ wheels = [
 ]
 
 [[package]]
+name = "cloudpickle"
+version = "3.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/39/069100b84d7418bc358d81669d5748efb14b9cceacd2f9c75f550424132f/cloudpickle-3.1.1.tar.gz", hash = "sha256:b216fa8ae4019d5482a8ac3c95d8f6346115d8835911fd4aefd1a445e4242c64", size = 22113 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/e8/64c37fadfc2816a7701fa8a6ed8d87327c7d54eacfbfb6edab14a2f2be75/cloudpickle-3.1.1-py3-none-any.whl", hash = "sha256:c8c5a44295039331ee9dad40ba100a9c7297b6f988e50e87ccdf3765a668350e", size = 20992 },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -507,6 +528,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/09/35/2495c4ac46b980e4ca1f6ad6db102322ef3ad2410b79fdde159a4b0f3b92/exceptiongroup-1.2.2.tar.gz", hash = "sha256:47c2edf7c6738fafb49fd34290706d1a1a2f4d1c6df275526b62cbb4aa5393cc", size = 28883 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/02/cc/b7e31358aac6ed1ef2bb790a9746ac2c69bcb3c8588b41616914eb106eaf/exceptiongroup-1.2.2-py3-none-any.whl", hash = "sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b", size = 16453 },
+]
+
+[[package]]
+name = "farama-notifications"
+version = "0.0.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/2c/8384832b7a6b1fd6ba95bbdcae26e7137bb3eedc955c42fd5cdcc086cfbf/Farama-Notifications-0.0.4.tar.gz", hash = "sha256:13fceff2d14314cf80703c8266462ebf3733c7d165336eee998fc58e545efd18", size = 2131 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/2c/ffc08c54c05cdce6fbed2aeebc46348dbe180c6d2c541c7af7ba0aa5f5f8/Farama_Notifications-0.0.4-py3-none-any.whl", hash = "sha256:14de931035a41961f7c056361dc7f980762a143d05791ef5794a751a2caf05ae", size = 2511 },
 ]
 
 [[package]]
@@ -751,6 +781,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/52/36/bbdede67400277bef33d3ec0e6a31750da972c469f75966b4930c753218f/groovy-0.1.2.tar.gz", hash = "sha256:25c1dc09b3f9d7e292458aa762c6beb96ea037071bf5e917fc81fb78d2231083", size = 17325 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/28/27/3d6dcadc8a3214d8522c1e7f6a19554e33659be44546d44a2f7572ac7d2a/groovy-0.1.2-py3-none-any.whl", hash = "sha256:7f7975bab18c729a257a8b1ae9dcd70b7cafb1720481beae47719af57c35fa64", size = 14090 },
+]
+
+[[package]]
+name = "gymnasium"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cloudpickle" },
+    { name = "farama-notifications" },
+    { name = "numpy" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/90/69/70cd29e9fc4953d013b15981ee71d4c9ef4d8b2183e6ef2fe89756746dce/gymnasium-1.1.1.tar.gz", hash = "sha256:8bd9ea9bdef32c950a444ff36afc785e1d81051ec32d30435058953c20d2456d", size = 829326 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/68/2bdc7b46b5f543dd865575f9d19716866bdb76e50dd33b71ed1a3dd8bb42/gymnasium-1.1.1-py3-none-any.whl", hash = "sha256:9c167ec0a2b388666e37f63b2849cd2552f7f5b71938574c637bb36487eb928a", size = 965410 },
 ]
 
 [[package]]
@@ -1019,6 +1064,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/35/87/bcda8e46c88d0e34c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f8/62/d9ba6323b9202dd2fe166beab8a86d29465c41a0288cbe229fac60c1ab8d/jsonlines-4.0.0-py3-none-any.whl", hash = "sha256:185b334ff2ca5a91362993f42e83588a360cf95ce4b71a73548502bda52a7c55", size = 8701 },
 ]
+
+[[package]]
+name = "langdetect"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/72/a3add0e4eec4eb9e2569554f7c70f4a3c27712f40e3284d483e88094cc0e/langdetect-1.0.9.tar.gz", hash = "sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0", size = 981474 }
 
 [[package]]
 name = "latex2sympy2-extended"
@@ -1447,7 +1501,7 @@ name = "nvidia-cudnn-cu12"
 version = "9.5.1.17"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12" },
+    { name = "nvidia-cublas-cu12", marker = "sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2a/78/4535c9c7f859a64781e43c969a3a7e84c54634e319a996d43ef32ce46f83/nvidia_cudnn_cu12-9.5.1.17-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:30ac3869f6db17d170e0e556dd6cc5eee02647abc31ca856634d5a40f82c15b2", size = 570988386 },
@@ -1458,7 +1512,7 @@ name = "nvidia-cufft-cu12"
 version = "11.3.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-nvjitlink-cu12", marker = "sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8f/16/73727675941ab8e6ffd86ca3a4b7b47065edcca7a997920b831f8147c99d/nvidia_cufft_cu12-11.3.0.4-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:ccba62eb9cef5559abd5e0d54ceed2d9934030f51163df018532142a8ec533e5", size = 200221632 },
@@ -1487,9 +1541,9 @@ name = "nvidia-cusolver-cu12"
 version = "11.7.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12" },
-    { name = "nvidia-cusparse-cu12" },
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-cublas-cu12", marker = "sys_platform == 'linux'" },
+    { name = "nvidia-cusparse-cu12", marker = "sys_platform == 'linux'" },
+    { name = "nvidia-nvjitlink-cu12", marker = "sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f0/6e/c2cf12c9ff8b872e92b4a5740701e51ff17689c4d726fca91875b07f655d/nvidia_cusolver_cu12-11.7.1.2-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:e9e49843a7707e42022babb9bcfa33c29857a93b88020c4e4434656a655b698c", size = 158229790 },
@@ -1501,7 +1555,7 @@ name = "nvidia-cusparse-cu12"
 version = "12.5.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-nvjitlink-cu12", marker = "sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/06/1e/b8b7c2f4099a37b96af5c9bb158632ea9e5d9d27d7391d7eb8fc45236674/nvidia_cusparse_cu12-12.5.4.2-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:7556d9eca156e18184b94947ade0fba5bb47d69cec46bf8660fd2c71a4b48b73", size = 216561367 },
@@ -2741,7 +2795,7 @@ name = "triton"
 version = "3.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "setuptools" },
+    { name = "setuptools", marker = "sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/04/d54d3a6d077c646624dc9461b0059e23fd5d30e0dbe67471e3654aec81f9/triton-3.3.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:fad99beafc860501d7fcc1fb7045d9496cbe2c882b1674640304949165a916e7", size = 156441993 },

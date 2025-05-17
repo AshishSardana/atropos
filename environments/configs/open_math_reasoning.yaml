@@ -1,0 +1,26 @@
+# OpenMathReasoning Environment configuration
+env:
+  group_size: 8
+  max_batches_offpolicy: 3
+  tokenizer_name: "NousResearch/DeepHermes-3-Llama-3-3B-Preview"
+  use_wandb: true
+  rollout_server_url: "http://localhost:8000"
+  wandb_name: "open_math_reasoning"
+  ensure_scores_are_not_same: true
+  data_path_to_save_groups: null
+  include_messages: true
+  max_token_length: 2048
+  batch_size: 12
+  total_steps: 1000
+  steps_per_eval: 100
+
+# OpenAI server configurations
+openai:
+  - model_name: "NousResearch/DeepHermes-3-Llama-3-3B-Preview"
+    base_url: "http://localhost:9001/v1"
+    api_key: "x"
+    num_requests_for_eval: 256
+    weight: 1.0
+
+slurm: false
+testing: false 
