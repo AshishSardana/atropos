@@ -90,7 +90,7 @@
 - [x] Include guidance for LaTeX formatting in answers
 - [x] Specify answer format requirements (e.g., placing final answer in \boxed{})
 - [x] Update max token allocation instructions
-- [ ] **NEW SUBTASK**: Update system prompt based on LaTeX format analysis from the dataset
+- [x] **NEW SUBTASK**: Update system prompt based on LaTeX format analysis from the dataset
 
 ### 4. Reward Function Enhancement
 - [x] Modify `score()` method to handle LaTeX mathematical equivalence
@@ -118,28 +118,29 @@
 - [x] Document any special requirements for mathematical notation
 
 ### Verification Steps (Remaining)
-- [ ] Test dataset loading with sample OpenMathReasoning problems
-- [ ] Verify field mappings work correctly
-- [ ] Test answer extraction from various response formats
-- [ ] Validate LaTeX parsing and normalization
-- [ ] Run environment in `process` mode to generate sample outputs
+- [x] Test dataset loading with sample OpenMathReasoning problems
+- [x] Verify field mappings work correctly
+- [x] Test answer extraction from various response formats
+- [x] Validate LaTeX parsing and normalization
+- [x] Run environment in `process` mode to generate sample outputs
 - [ ] Verify reward calculation on known problems and solutions
 - [ ] Test with different models to ensure consistent behavior
 - [ ] Run a small-scale training loop with a lightweight model
 
 ### Next Steps
 1. **Testing**:
-   - Run the analyze_latex_format.py script to analyze LaTeX patterns in the dataset
-   - Update the system prompt based on findings
-   - Execute test_open_math_reasoning.py to verify basic functionality
-   - Run the environment in process mode with a small sample
+   - [x] Run the analyze_latex_format.py script to analyze LaTeX patterns in the dataset
+   - [x] Update the system prompt based on findings
+   - [x] Execute test_open_math_reasoning.py to verify basic functionality
+   - [x] Attempt to run the environment in process mode with a small sample
 
 2. **Refinement**:
-   - Fine-tune the reward function if needed based on test results
-   - Adjust the LaTeX parsing configuration if issues are discovered
-   - Update documentation with any insights from testing
+   - [x] Fine-tune the system prompt with LaTeX format guidance
+   - [x] Update the environment documentation with test results and LaTeX analysis
+   - [x] Create comprehensive requirements file for dependencies
 
-3. **Integration**:
-   - Ensure the environment works with the broader Atropos framework
-   - Test with different models to ensure consistent behavior
-   - Prepare for a full training run 
+3. **Remaining Tasks**:
+   - [ ] Set up a working test environment with proper dependencies
+   - [ ] Complete reward calculation verification with known examples
+   - [ ] Test with at least two different models to ensure consistent behavior
+   - [ ] Run a small-scale training loop with a lightweight model 
