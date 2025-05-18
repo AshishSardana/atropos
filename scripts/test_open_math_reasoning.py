@@ -6,20 +6,36 @@ This script loads the OpenMathReasoning dataset, selects a sample problem,
 and runs it through the environment to verify the implementation.
 """
 
-import asyncio
 import random
 import json
 import os
-from typing import Dict, List, Any, Tuple
+import http.client
+from typing import Dict
 
 from datasets import load_dataset
 from pprint import pprint
 
-from atroposlib.envs.base import BaseEnvConfig, APIServerConfig
-from atroposlib.server import OpenAIServer
-from environments.open_math_reasoning_server import OpenMathReasoningEnv, system_prompt
+# Define the system prompt directly to avoid importing dependencies that require torch
+system_prompt = (
+    "You are a deep thinking AI specializing in advanced mathematics. "
+    "You may use extremely long chains of thought "
+    "to deeply consider mathematical problems and deliberate with yourself via systematic "
+    "reasoning processes to help come to a correct solution prior to answering. "
+    "You should enclose your thoughts and internal monologue inside <think> </think> "
+    "tags, and then provide your solution or response to the problem.\n\n"
+)
 
-async def main():
+system_prompt += """You are allocated a maximum of 2048 tokens, please strive to use less.
+
+You should use proper LaTeX notation when writing mathematical expressions and formulas.
+For example, use \\frac{a}{b} for fractions, \\sqrt{x} for square roots, and ^ for exponents.
+
+You will then provide your final answer like this: \\boxed{your answer here}
+It is important that you provide your answer in the correct LaTeX format.
+If you do not, you will not receive credit for your answer.
+So please end your answer with \\boxed{your answer here}"""
+
+def main():
     # Create output directory if it doesn't exist
     os.makedirs("output", exist_ok=True)
     output_file = "output/test_results.json"
@@ -38,102 +54,114 @@ async def main():
     if sample.get('problem_source'):
         print(f"Source: {sample['problem_source']}")
     
-    # Setup configuration
-    config = BaseEnvConfig(
-        tokenizer_name="NousResearch/DeepHermes-3-Llama-3-3B-Preview",
-        group_size=1,  # Just testing with one response
-        use_wandb=False,
-        rollout_server_url="http://localhost:8000",
-        total_steps=1,
-        batch_size=1,
-        steps_per_eval=1,
-        max_token_length=2048,
-        wandb_name="open_math_reasoning_test",
-    )
+    # Get API key from environment variables
+    api_key = os.environ.get("NOUS_API_KEY")
+    if not api_key:
+        print("Error: NOUS_API_KEY environment variable not found.")
+        print("Please add it to your .env file in the atropos directory:")
+        print("NOUS_API_KEY=your_api_key_here")
+        return  # Exit the function if API key is missing
+
     
-    server_config = APIServerConfig(
-        model_name="NousResearch/DeepHermes-3-Llama-3-3B-Preview",
-        base_url="http://localhost:9001/v1",
-        api_key="x",
-        num_requests_for_eval=1,
-    )
+    # Setup NousResearch API
+    print("\nUsing NousResearch API for testing...")
+    conn = http.client.HTTPSConnection("inference-api.nousresearch.com")
+    headers = {
+        'Authorization': f"Bearer {api_key}",
+        'Content-Type': "application/json"
+    }
     
-    # Check if OpenAI API key is available (for real testing)
-    openai_api_key = os.environ.get("OPENAI_API_KEY")
-    if openai_api_key:
-        print("\nUsing OpenAI API for testing...")
-        # Override with OpenAI settings
-        server_config = APIServerConfig(
-            model_name="gpt-4o-mini",
-            api_key=openai_api_key,
-            num_requests_for_eval=1,
-        )
+    # Define max tokens
+    max_token_length = 16384
     
-    # Setup the server
-    server = OpenAIServer(server_config)
-    
-    # Test direct completion (simplified test without full environment setup)
-    print("\nTesting with direct completion...")
+    # Test with NousResearch API
+    print("\nTesting with NousResearch API...")
     try:
-        completion = await server.chat_completion(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": sample["problem"]},
+        # Prepare payload
+        payload = {
+            "model": "DeepHermes-3-Mistral-24B-Preview",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": sample["problem"]
+                }
             ],
-            n=1,
-            max_tokens=config.max_token_length,
-            temperature=0.0,
-        )
-        
-        model_response = completion.choices[0].message.content
-        
-        # Save the results
-        test_results = {
-            "problem_index": sample_index,
-            "problem": sample["problem"],
-            "expected_answer": sample["expected_answer"],
-            "model_response": model_response,
+            "max_tokens": max_token_length
         }
         
-        with open(output_file, "w") as f:
-            json.dump(test_results, f, indent=2)
+        # Send request
+        conn.request("POST", "/v1/chat/completions", json.dumps(payload), headers)
+        res = conn.getresponse()
+        data = res.read()
         
-        print(f"\nTest results saved to {output_file}")
+        # Parse response
+        response_data = json.loads(data.decode("utf-8"))
         
-        # Print the model's response
-        print("\nModel response:")
-        print("-" * 80)
-        print(model_response)
-        print("-" * 80)
+        # Print full response for debugging
+        print("\nAPI Response:")
+        print(json.dumps(response_data, indent=2))
         
-        # Check if the response contains a thinking section
-        if "<think>" in model_response and "</think>" in model_response:
-            print("\n✓ Response contains thinking section")
+        # Check if response contains an error
+        if "error" in response_data:
+            print(f"\nAPI Error: {response_data.get('error', {}).get('message', 'Unknown error')}")
+            return
+            
+        # Extract model response
+        if "choices" in response_data and len(response_data["choices"]) > 0:
+            model_response = response_data["choices"][0]["message"]["content"]
+            
+            # Save the results
+            test_results = {
+                "problem_index": sample_index,
+                "problem": sample["problem"],
+                "expected_answer": sample["expected_answer"],
+                "model_response": model_response,
+            }
+            
+            with open(output_file, "w") as f:
+                json.dump(test_results, f, indent=2)
+            
+            print(f"\nTest results saved to {output_file}")
+            
+            # Print the model's response
+            print("\nModel response:")
+            print("-" * 80)
+            print(model_response)
+            print("-" * 80)
+            
+            # Check if the response contains a thinking section
+            if "<think>" in model_response and "</think>" in model_response:
+                print("\n✓ Response contains thinking section")
+            else:
+                print("\n✗ Response missing thinking section")
+            
+            # Check if the response contains LaTeX
+            latex_commands = [
+                r"\frac", r"\sqrt", r"\boxed", r"\cdot", r"\sum", r"\prod", 
+                r"\int", r"\mathbb", r"\overline", r"\text"
+            ]
+            latex_found = any(cmd in model_response for cmd in latex_commands)
+            if latex_found:
+                print("✓ Response contains LaTeX notation")
+            else:
+                print("✗ Response may be missing LaTeX notation")
+            
+            # Check if the response ends with a boxed answer
+            if r"\boxed{" in model_response:
+                print("✓ Response contains boxed answer")
+            else:
+                print("✗ Response missing boxed answer")
         else:
-            print("\n✗ Response missing thinking section")
-        
-        # Check if the response contains LaTeX
-        latex_commands = [
-            r"\frac", r"\sqrt", r"\boxed", r"\cdot", r"\sum", r"\prod", 
-            r"\int", r"\mathbb", r"\overline", r"\text"
-        ]
-        latex_found = any(cmd in model_response for cmd in latex_commands)
-        if latex_found:
-            print("✓ Response contains LaTeX notation")
-        else:
-            print("✗ Response may be missing LaTeX notation")
-        
-        # Check if the response ends with a boxed answer
-        if r"\boxed{" in model_response:
-            print("✓ Response contains boxed answer")
-        else:
-            print("✗ Response missing boxed answer")
+            print("Error: API response doesn't contain expected 'choices' field")
+            print("Response structure:", list(response_data.keys()))
             
     except Exception as e:
         print(f"Error running test: {e}")
-    
-    # Close the server
-    await server.close()
+        print("Raw response data:", data.decode("utf-8") if 'data' in locals() else "No data received")
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    main() 

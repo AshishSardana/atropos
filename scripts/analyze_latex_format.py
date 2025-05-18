@@ -3,171 +3,243 @@
 Script to analyze LaTeX formats in the OpenMathReasoning dataset.
 
 This script examines the expected_answer field in the OpenMathReasoning dataset
-to identify common LaTeX patterns and structures. The analysis results can be used
-to improve the system prompt for the OpenMathReasoningEnv.
+to identify and count LaTeX formats. It samples 1% of the dataset for analysis
+and stores the results in a simple JSON file.
 """
 
 import re
 import json
-from collections import Counter, defaultdict
-from typing import Dict, List, Any, Set, Tuple
 import os
-
+import random
+import concurrent.futures
+from collections import Counter
 from datasets import load_dataset
 from tqdm import tqdm
+from functools import partial
 
-# LaTeX commands/structures to look for
-LATEX_PATTERNS = [
-    (r"\\frac\{.*?\}\{.*?\}", "Fractions"),
-    (r"\\sqrt\{.*?\}", "Square roots"),
-    (r"\\boxed\{.*?\}", "Boxed expressions"),
-    (r"\^", "Exponents"),
-    (r"_", "Subscripts"),
-    (r"\\cdot", "Multiplication dot"),
-    (r"\\sum", "Summation"),
-    (r"\\prod", "Product"),
-    (r"\\int", "Integral"),
-    (r"\\lim", "Limit"),
-    (r"\\infty", "Infinity"),
-    (r"\\mathbb\{.*?\}", "Special number sets"),
-    (r"\\overline\{.*?\}", "Overline"),
-    (r"\\text\{.*?\}", "Text in math mode"),
-    (r"\\ldots", "Ellipsis"),
-    (r"\\approx", "Approximation"),
-    (r"\\neq", "Not equal"),
-    (r"\\geq", "Greater than or equal"),
-    (r"\\leq", "Less than or equal"),
-    (r"\\rightarrow", "Right arrow"),
-    (r"\\leftarrow", "Left arrow"),
-    (r"\\leftrightarrow", "Bidirectional arrow"),
-    (r"\\Rightarrow", "Implies"),
-    (r"\\Leftarrow", "Is implied by"),
-    (r"\\Leftrightarrow", "If and only if"),
-    (r"\\forall", "For all"),
-    (r"\\exists", "There exists"),
-    (r"\\subset", "Subset"),
-    (r"\\subseteq", "Subset or equal"),
-    (r"\\cup", "Union"),
-    (r"\\cap", "Intersection"),
-    (r"\\emptyset", "Empty set"),
-    (r"\\in", "Element of"),
-    (r"\\notin", "Not element of"),
-    (r"\\sin", "Sine function"),
-    (r"\\cos", "Cosine function"),
-    (r"\\tan", "Tangent function"),
-    (r"\\log", "Logarithm"),
-    (r"\\ln", "Natural logarithm"),
-    (r"\\exp", "Exponential function"),
-]
+def extract_latex(text):
+    """
+    Extract all LaTeX code from the text.
+    
+    We look for common LaTeX patterns and delimiters:
+    - $...$
+    - $$...$$
+    - \(...\)
+    - \[...\]
+    - \begin{...}...\end{...}
+    - \command{...}
+    """
+    latex_patterns = [
+        # Math delimiters
+        (r'\$\$(.*?)\$\$', 'display_math'),
+        (r'\$(.*?)\$', 'inline_math'),
+        (r'\\[\(](.*?)\\[\)]', 'inline_math'),
+        (r'\\[\[](.*?)\\[\]]', 'display_math'),
+        
+        # LaTeX environments
+        (r'\\begin\{(.*?)\}(.*?)\\end\{\1\}', 'environment'),
+        
+        # Common LaTeX commands
+        (r'\\boxed\{(.*?)\}', 'boxed'),
+        (r'\\frac\{(.*?)\}\{(.*?)\}', 'fraction'),
+        (r'\\sqrt\{(.*?)\}', 'square_root'),
+        (r'\\mathbb\{(.*?)\}', 'mathbb'),
+        (r'\\text\{(.*?)\}', 'text'),
+    ]
+    
+    latex_formats = []
+    
+    for pattern, format_type in latex_patterns:
+        matches = re.findall(pattern, text, re.DOTALL)
+        if matches:
+            for match in matches:
+                if isinstance(match, tuple):
+                    # For patterns with multiple capture groups
+                    latex_formats.append(f"{format_type}:{pattern}")
+                else:
+                    latex_formats.append(f"{format_type}:{pattern}")
+    
+    # If no specific patterns matched but has LaTeX commands, capture those
+    if not latex_formats and re.search(r'\\[a-zA-Z]+', text):
+        commands = re.findall(r'\\[a-zA-Z]+', text)
+        for cmd in commands:
+            latex_formats.append(f"command:{cmd}")
+    
+    return latex_formats
+
+def process_batch(indices, dataset, batch_id):
+    """Process a batch of dataset indices in parallel."""
+    # Initialize counters for this batch
+    no_latex_count = 0
+    latex_format_counts = Counter()
+    answers_without_latex = []
+    answers_with_latex = {}
+    
+    for idx in indices:
+        answer = dataset[idx]["expected_answer"]
+        
+        # Extract LaTeX formats
+        latex_formats = extract_latex(answer)
+        
+        if not latex_formats:
+            no_latex_count += 1
+            # Save every alternate answer without LaTeX
+            if no_latex_count % 2 == 1:
+                answers_without_latex.append(answer)
+        else:
+            # Count each format
+            for format_str in latex_formats:
+                latex_format_counts[format_str] += 1
+                
+                # Save every alternate answer with this LaTeX format
+                if format_str not in answers_with_latex:
+                    answers_with_latex[format_str] = []
+                
+                # Check if we should save this answer (every alternate one)
+                current_count = latex_format_counts[format_str]
+                if current_count % 2 == 1:
+                    if len(answers_with_latex[format_str]) < 5:  # Limit to 5 examples per format
+                        answers_with_latex[format_str].append(answer)
+    
+    return {
+        'no_latex_count': no_latex_count, 
+        'latex_format_counts': latex_format_counts,
+        'answers_without_latex': answers_without_latex,
+        'answers_with_latex': answers_with_latex,
+        'batch_id': batch_id
+    }
 
 def main():
     # Create output directory if it doesn't exist
     os.makedirs("output", exist_ok=True)
-    output_file = "output/latex_analysis.json"
+    output_file = "output/latex_format_counts.json"
+    no_latex_output = "output/ans_without_latex.txt"
+    with_latex_output = "output/ans_with_latex.json"
     
     print(f"Loading OpenMathReasoning dataset...")
     dataset = load_dataset("nvidia/OpenMathReasoning", split="cot")
     
-    # Extract expected_answer field
-    answers = [item["expected_answer"] for item in dataset]
+    # Sample 1% of the dataset
+    total_samples = len(dataset)
+    sample_size = max(1, int(total_samples * 0.01))  # At least 1 sample
     
-    print(f"Analyzing {len(answers)} answers...")
+    print(f"Sampling {sample_size} out of {total_samples} samples (1%)...")
+    sample_indices = random.sample(range(total_samples), sample_size)
     
-    # Initialize counters and collections
-    pattern_counts = Counter()
-    latex_commands = Counter()
-    answer_structures = Counter()
-    complex_structures = []
+    # Determine the number of cores to use for parallel processing
+    num_cores = os.cpu_count()
+    # Use 80% of available cores but at least 1
+    num_workers = max(1, int(num_cores * 0.8))
     
-    # Track unique LaTeX commands
-    all_commands = set()
+    # Create smaller batches for more frequent progress updates
+    # Use a fixed batch size to ensure frequent updates regardless of number of workers
+    fixed_batch_size = 100  # Each batch will process 100 items
+    batches = []
+    for i in range(0, sample_size, fixed_batch_size):
+        end = min(i + fixed_batch_size, sample_size)
+        batches.append(sample_indices[i:end])
     
-    # Track escaping patterns
-    escape_patterns = Counter()
+    print(f"Processing data using {num_workers} workers across {len(batches)} batches...")
+    print(f"Each batch contains {fixed_batch_size} samples for more frequent progress updates")
     
-    # Analyze answers
-    for answer in tqdm(answers):
-        # Check for LaTeX patterns
-        for pattern, name in LATEX_PATTERNS:
-            if re.search(pattern, answer):
-                pattern_counts[name] += 1
-        
-        # Extract all LaTeX commands
-        commands = re.findall(r"\\[a-zA-Z]+", answer)
-        for cmd in commands:
-            latex_commands[cmd] += 1
-            all_commands.add(cmd)
-        
-        # Check for overall structure
-        if answer.startswith("\\boxed{") and answer.endswith("}"):
-            answer_structures["Boxed only"] += 1
-        elif answer.startswith("\\(") and answer.endswith("\\)"):
-            answer_structures["Math delimiters \\(\\)"] += 1
-        elif answer.startswith("$") and answer.endswith("$"):
-            answer_structures["Math delimiters $"] += 1
-        elif answer.startswith("$$") and answer.endswith("$$"):
-            answer_structures["Display math $$"] += 1
-        
-        # Check for escaped special characters
-        escape_matches = re.findall(r"\\[\{\}\[\]\(\)]", answer)
-        for escape in escape_matches:
-            escape_patterns[escape] += 1
-        
-        # Save complex examples (many LaTeX commands)
-        if len(commands) > 10:
-            complex_structures.append({
-                "answer": answer,
-                "command_count": len(commands),
-                "unique_commands": list(set(commands))
-            })
+    # Process batches in parallel
+    results = []
+    completed_batches = 0
+    total_batches = len(batches)
     
-    # Sort complex examples by command count (most complex first)
-    complex_structures.sort(key=lambda x: x["command_count"], reverse=True)
+    # Use a ProcessPoolExecutor with a progress bar
+    with tqdm(total=total_batches, desc="Processing batches") as pbar:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+            # Submit all jobs
+            future_to_batch = {
+                executor.submit(process_batch, batch, dataset, i): i 
+                for i, batch in enumerate(batches)
+            }
+            
+            # Process results as they complete
+            for future in concurrent.futures.as_completed(future_to_batch):
+                batch_id = future_to_batch[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                    completed_batches += 1
+                    # Update progress bar with percentage
+                    pbar.update(1)
+                    pbar.set_postfix({"progress": f"{completed_batches/total_batches*100:.1f}%"})
+                except Exception as e:
+                    print(f"\nBatch {batch_id} generated an exception: {e}")
+    
+    # Combine results from all batches
+    no_latex_in_ans = sum(r['no_latex_count'] for r in results)
+    
+    # Combine all counters
+    latex_format_counts = Counter()
+    for r in results:
+        latex_format_counts.update(r['latex_format_counts'])
+    
+    # Combine answers without LaTeX (taking a sample from each batch)
+    answers_without_latex = []
+    for r in results:
+        answers_without_latex.extend(r['answers_without_latex'])
+    
+    # Combine answers with LaTeX, ensuring we don't exceed 5 examples per format
+    answers_with_latex = {}
+    for r in results:
+        for format_str, answers in r['answers_with_latex'].items():
+            if format_str not in answers_with_latex:
+                answers_with_latex[format_str] = []
+            
+            remaining_slots = 5 - len(answers_with_latex[format_str])
+            if remaining_slots > 0:
+                answers_with_latex[format_str].extend(answers[:remaining_slots])
+    
+    # Prepare summary
+    summary = {
+        "summary": {
+            "total_samples": sample_size,
+            "no_latex_count": no_latex_in_ans,
+            "with_latex_count": sample_size - no_latex_in_ans,
+            "percent_without_latex": f"{no_latex_in_ans/sample_size*100:.1f}%",
+            "percent_with_latex": f"{(sample_size - no_latex_in_ans)/sample_size*100:.1f}%",
+            "num_workers_used": num_workers,
+            "num_batches": len(batches),
+            "batch_size": fixed_batch_size
+        }
+    }
     
     # Prepare results
     results = {
-        "total_answers": len(answers),
-        "pattern_counts": {k: v for k, v in pattern_counts.most_common()},
-        "latex_commands": {k: v for k, v in latex_commands.most_common(30)},  # Top 30 commands
-        "all_unique_commands": sorted(list(all_commands)),
-        "answer_structures": {k: v for k, v in answer_structures.most_common()},
-        "escape_patterns": {k: v for k, v in escape_patterns.most_common()},
-        "complex_examples": complex_structures[:10],  # Top 10 most complex examples
+        **summary,
+        "latex_format_counts": dict(latex_format_counts.most_common())
     }
     
     # Save results
     with open(output_file, "w") as f:
         json.dump(results, f, indent=2)
     
+    # Save answers without LaTeX
+    with open(no_latex_output, "w") as f:
+        for i, answer in enumerate(answers_without_latex):
+            f.write(f"Answer #{i+1}:\n{answer}\n\n{'='*50}\n\n")
+    
+    # Save answers with LaTeX
+    with open(with_latex_output, "w") as f:
+        json.dump(answers_with_latex, f, indent=2)
+    
     print(f"Analysis results saved to {output_file}")
+    print(f"Answers without LaTeX saved to {no_latex_output}")
+    print(f"Answers with LaTeX saved to {with_latex_output}")
     
     # Print summary
     print("\nSummary:")
-    print(f"Total answers analyzed: {len(answers)}")
-    print("\nTop 10 LaTeX patterns:")
-    for pattern, count in pattern_counts.most_common(10):
-        print(f"  {pattern}: {count} ({count/len(answers)*100:.1f}%)")
+    print(f"Total answers analyzed: {sample_size}")
+    print(f"Answers without LaTeX: {no_latex_in_ans} ({no_latex_in_ans/sample_size*100:.1f}%)")
+    print(f"Answers with LaTeX: {sample_size - no_latex_in_ans} ({(sample_size - no_latex_in_ans)/sample_size*100:.1f}%)")
+    print(f"Processed using {num_workers} parallel workers across {len(batches)} batches of {fixed_batch_size} samples each")
     
-    print("\nTop 10 LaTeX commands:")
-    for cmd, count in latex_commands.most_common(10):
-        print(f"  {cmd}: {count} ({count/len(answers)*100:.1f}%)")
-    
-    print("\nAnswer structures:")
-    for structure, count in answer_structures.most_common():
-        print(f"  {structure}: {count} ({count/len(answers)*100:.1f}%)")
-    
-    # Generate system prompt suggestions
-    print("\nSuggested system prompt additions:")
-    top_patterns = [name for name, _ in pattern_counts.most_common(10)]
-    top_commands = [cmd for cmd, _ in latex_commands.most_common(10)]
-    
-    prompt_suggestion = "Based on the analysis, consider adding these instructions to the system prompt:\n\n"
-    prompt_suggestion += "You should use proper LaTeX notation when writing mathematical expressions. "
-    prompt_suggestion += f"Common notations in this domain include: {', '.join(top_patterns)}.\n\n"
-    prompt_suggestion += "Make sure to use these common LaTeX commands correctly: "
-    prompt_suggestion += ", ".join(top_commands)
-    
-    print(prompt_suggestion)
+    print("\nTop 10 LaTeX formats:")
+    for format_str, count in latex_format_counts.most_common(10):
+        print(f"  {format_str}: {count} ({count/(sample_size - no_latex_in_ans)*100:.1f}% of answers with LaTeX)")
 
 if __name__ == "__main__":
     main() 
